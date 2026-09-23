@@ -100,8 +100,19 @@ const parseLocale = (tag: string): Intl.Locale | undefined => {
  * salvage; a well-formed tag ICU knows nothing about keeps an `undefined`
  * script instead.
  */
-const resolveLocale = (tag: string): Intl.Locale | undefined =>
-  parseLocale(tag)?.maximize();
+const resolveLocale = (tag: string): Intl.Locale | undefined => {
+  const locale = parseLocale(tag);
+  try {
+    return locale?.maximize();
+  } catch {
+    // V8 (Chrome, Node) throws a RangeError from `maximize()` for a
+    // syntactically valid tag it has no likely-subtags data for — including
+    // Orama's own default tokenizer language, `english`, which every query on
+    // a Latin-script index reaches through `isBigramLanguage`. Keep the
+    // unmaximized locale so an explicit script subtag is still honored.
+    return locale;
+  }
+};
 
 /**
  * Indexes whose language maximizes to one of these scripts are built as
