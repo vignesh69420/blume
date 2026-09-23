@@ -573,6 +573,27 @@ describe("orama index helpers", () => {
     expect(hits[0]?.route).toBe("/guides/config");
   });
 
+  it("queries a Latin index when maximize() throws, as V8 does for `english`", async () => {
+    // Chrome and Node throw a RangeError from `Intl.Locale#maximize()` for a
+    // tag with no likely-subtags data, such as Orama's default tokenizer
+    // language `english`. JavaScriptCore returns the tag unchanged, so the
+    // V8 behavior is reproduced here.
+    const original = Intl.Locale.prototype.maximize;
+    Intl.Locale.prototype.maximize = function maximize(this: Intl.Locale) {
+      if (this.language === "english") {
+        throw new RangeError("Incorrect locale information provided");
+      }
+      return original.call(this);
+    };
+    try {
+      const db = await buildOramaIndex(DATA.documents);
+      const hits = await queryOramaIndex(db, "configuration", 5);
+      expect(hits[0]?.route).toBe("/guides/config");
+    } finally {
+      Intl.Locale.prototype.maximize = original;
+    }
+  });
+
   it("filters results to a locale when one is given", async () => {
     const db = await buildOramaIndex([
       {
